@@ -1,0 +1,10 @@
+Dependency
+install Mysql
+pip install pygithub
+
+#Ubuntu
+apt-get install libmysqlclient-dev
+
+#Centos
+yum install MySQL-python
+
