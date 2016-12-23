@@ -1,31 +1,14 @@
 #!/usr/bin/env python
 
 from github import *
+from git import *
 import MySQLdb
 import thread
 import time
-
-Git = Github("Alvin-Lau", "qaz123@WSX")
-Repo = Git.get_repo("LeiLiu1991/test_auto")
-Db = MySQLdb.connect("localhost","root","password")
-Cursor = Db.cursor()
-#Last_round_pull_id_list = []
-
-def apply_single_patch(url, merge_commit_sha):
-    pull_number = int(url.split('/')[-1])
-    pull = Repo.get_pull(pull_number)
-    if pull.merge_commit_sha == merge_commit_sha:
-        
-    else:
-        print "This patch was rewrited"
-        
-
-def apply_epic_patches(Cursor):
-    print "aaaa\n"
+import os
 
 def main():
 
-    Cursor.execute("use auto_code_review")
 
     #Just leave this. Revisite is needed
     #sql_create_table = 'create table if not exists pull_request( \
@@ -40,6 +23,9 @@ def main():
     #Cursor.execute(sql_create_table)
 
     while True:
+        Db = MySQLdb.connect("localhost","root","password")
+        Cursor = Db.cursor()
+        Cursor.execute("use auto_code_review")
         sql_query_new_pull_request  = "SELECT merge_commit_sha, \
                                               url, epic from pull_request \
                                               where test_state='NEW'"
@@ -61,18 +47,23 @@ def main():
                 except:                                                         
                     Db.rollback()      
 
-                thread.start_new_thread( apply_single_patch, (url,merge_commit_sha,))
+                #Call Jenkins here
+                print "Call Jenkins"
             else:
                 sql_query_epic_pull_request = "SELECT url from pull_request \
                                                where epic='"  + epic + "'" 
-                epic_count = epic.split("@@")[1]
-                epic_query_count = Cursor.execute(sql_query_new_pull_request)
-                if epic_query_count < epic_count:
+                epic_count = int(epic.split("@@")[1])
+                epic_query_count = Cursor.execute(sql_query_epic_pull_request)
+                if int(epic_query_count) < epic_count:
                     continue
                 else:
-                    epic_results = list(Cursor.fetchall())
-                    epic_results = list(set(epic_results))
-                    if len(epic_results) >= epic_count:
+                    epic_url = Cursor.fetchall()
+                    epic_results_list = list(set(list(epic_url)))
+                    print "epic_results_list" + "\tepic_count"
+                    print len(epic_results_list)
+                    print int(epic_count)
+                    
+                    if len(epic_results_list) >= epic_count:
                         sql_update_epic = "UPDATE pull_request SET test_state='EPIC_READY' \
                                            where epic='" + epic + "'"
 
@@ -81,9 +72,11 @@ def main():
                             Db.commit()                                                 
                         except:                                                         
                             Db.rollback()      
-                        thread.start_new_thrursor.execute(sql_insert_new_record)
+                        print epic_url
                     else:
                         continue
+        Db.close()
 
 if __name__ == '__main__':
+
     main()
