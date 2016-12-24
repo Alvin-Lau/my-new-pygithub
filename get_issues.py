@@ -4,31 +4,13 @@ from github import *
 import MySQLdb
 import time
 
-Git = Github("Alvin-Lau", "")
-#Last_round_pull_id_list = []
+Git = Github("leiliu1991", "")
 
 def get_pull(Repo):
 
-    #create database if not exists
-    Db = MySQLdb.connect("localhost","root","password")
+    Db = MySQLdb.connect("localhost","root","zstack.mysql.password")
     Cursor = Db.cursor()
-    sql_create_database = 'create database if not exists auto_code_review'
-    Cursor.execute(sql_create_database)
-
     Cursor.execute("use auto_code_review")
-
-    #create table  if not exists
-    #code_review_id INT NOT NULL AUTO_INCREMENT,
-    sql_create_table = 'create table if not exists pull_request( \
-                               code_review_id INT NOT NULL AUTO_INCREMENT, \
-                               merge_commit_sha CHAR(64), \
-                               url VARCHAR(170) NOT NULL, \
-                               epic VARCHAR(100), \
-                               test_state CHAR(30) NOT NULL, \
-                               updated_at datetime, \
-                               PRIMARY KEY(code_review_id) \
-                               )'
-    Cursor.execute(sql_create_table)
 
     Pulls_List = Repo.get_pulls()
     
@@ -62,11 +44,34 @@ def get_pull(Repo):
 
 def main():
 
+    #create database if not exists
+    Db = MySQLdb.connect("localhost","root","zstack.mysql.password")
+    Cursor = Db.cursor()
+    sql_create_database = 'create database if not exists auto_code_review'
+    Cursor.execute(sql_create_database)
+    Db.commit()
+
+    #create table  if not exists
+    #code_review_id INT NOT NULL AUTO_INCREMENT,
+    sql_create_table = 'create table if not exists pull_request( \
+                               code_review_id INT NOT NULL AUTO_INCREMENT, \
+                               merge_commit_sha CHAR(64), \
+                               url VARCHAR(170) NOT NULL, \
+                               epic VARCHAR(100), \
+                               test_state CHAR(30) NOT NULL, \
+                               updated_at datetime, \
+                               PRIMARY KEY(code_review_id) \
+                               )'
+    Cursor.execute(sql_create_table)
+    Db.commit()
+    Db.close()
+
     while True:
         Repo = Git.get_repo("LeiLiu1991/test_auto")
         get_pull(Repo)
         Repo = Git.get_repo("LeiLiu1991/test_auto_2")
         get_pull(Repo)
+        time.sleep(15)
 
 if __name__ == '__main__':
     main()

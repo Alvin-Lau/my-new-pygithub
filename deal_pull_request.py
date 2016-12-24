@@ -9,21 +9,8 @@ import os
 
 def main():
 
-
-    #Just leave this. Revisite is needed
-    #sql_create_table = 'create table if not exists pull_request( \
-    #                           code_review_id INT NOT NULL AUTO_INCREMENT, \
-    #                           merge_commit_sha CHAR(64), \
-    #                           url VARCHAR(170) NOT NULL, \
-    #                           epic VARCHAR(100), \
-    #                           test_state CHAR(30) NOT NULL, \
-    #                           updated_at datetime, \
-    #                           PRIMARY KEY(code_review_id) \
-    #                           )'
-    #Cursor.execute(sql_create_table)
-
     while True:
-        Db = MySQLdb.connect("localhost","root","password")
+        Db = MySQLdb.connect("localhost","root","zstack.mysql.password")
         Cursor = Db.cursor()
         Cursor.execute("use auto_code_review")
         sql_query_new_pull_request  = "SELECT merge_commit_sha, \
@@ -59,9 +46,6 @@ def main():
                 else:
                     epic_url = Cursor.fetchall()
                     epic_results_list = list(set(list(epic_url)))
-                    print "epic_results_list" + "\tepic_count"
-                    print len(epic_results_list)
-                    print int(epic_count)
                     
                     if len(epic_results_list) >= epic_count:
                         sql_update_epic = "UPDATE pull_request SET test_state='EPIC_READY' \
@@ -76,6 +60,7 @@ def main():
                     else:
                         continue
         Db.close()
+        time.sleep(15)
 
 if __name__ == '__main__':
 
