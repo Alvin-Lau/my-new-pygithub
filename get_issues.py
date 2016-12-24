@@ -47,6 +47,7 @@ def main():
     #create database if not exists
     Db = MySQLdb.connect("localhost","root","zstack.mysql.password")
     Cursor = Db.cursor()
+    Cursor.execute("use auto_code_review")
     sql_create_database = 'create database if not exists auto_code_review'
     Cursor.execute(sql_create_database)
     Db.commit()
