@@ -4,7 +4,8 @@ from github import *
 import MySQLdb
 import time
 
-Git = Github("leiliu1991", "")
+github_token = os.environ["GITHUB_API_TOKEN"]
+Git = Github(github_token)
 
 test_auto_pull_list = []
 
@@ -47,11 +48,13 @@ def get_pull(Repo):
             issue_label_name_list.append(label.name)
 
         if pull.head.label.find("@@") == -1:
-            if "Pass" in issue_label_name_list and "Reviewed" in issue_label_name_list:
+            #if "Pass" in issue_label_name_list and "Reviewed" in issue_label_name_list:
+            if "REVIEWED-BY-MAINTAINER" in issue_label_name_list:
                 pull.merge(pull.title)
                 update_datase_pull_merged(pull)
         else:
-            if "Pass" in issue_label_name_list and "Reviewed" in issue_label_name_list:
+            #if "Pass" in issue_label_name_list and "Reviewed" in issue_label_name_list:
+            if "REVIEWED-BY-MAINTAINER" in issue_label_name_list:
                 test_auto_pull_list.append(pull)
 
 
@@ -81,10 +84,11 @@ def main():
 
     while True:
         global test_auto_pull_list
-        Repo = Git.get_repo("LeiLiu1991/test_auto")
-        get_pull(Repo)
-        Repo = Git.get_repo("LeiLiu1991/test_auto_2")
-        get_pull(Repo)
+
+        for repo in environ["repo_list"].split(" "):
+            print repo
+            Repo = Git.get_repo(repo)
+            get_pull(Repo)
         print test_auto_pull_list
 
         pull_epic_list = []
@@ -93,15 +97,23 @@ def main():
             pull_epic_list.append(pull.head.label)
 
         uniqe_pull_epic_list = set(pull_epic_list)
+
+
+        mergeable_pull_list = []
         for epic in uniqe_pull_epic_list:
             expected_epic_num = int(epic.split("@@")[-1])
 
             if pull_epic_list.count(epic) == expected_epic_num:
 
                 for pull in test_auto_pull_list:
-                    if pull.head.label == epic:
-                        update_datase_pull_merged(pull)
-                        pull.merge(pull.title)
+                    if pull.head.label == epic and pull.mergeable:
+                        mergeable_pull_list.append(pull)
+                if len(mergeable_pull_list) == expected_epic_num:
+                    for pull in mergeable_pull
+                            update_datase_pull_merged(pull)
+                            pull.merge(pull.title)
+                else:
+                    
 
         test_auto_pull_list = []
 

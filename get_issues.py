@@ -3,8 +3,10 @@
 from github import *
 import MySQLdb
 import time
+import os
 
-Git = Github("leiliu1991", "")
+github_token = os.environ["GITHUB_API_TOKEN"]
+Git = Github(github_token)
 
 def get_pull(Repo):
 
@@ -68,11 +70,11 @@ def main():
     Db.close()
 
     while True:
-        Repo = Git.get_repo("LeiLiu1991/test_auto")
-        get_pull(Repo)
-        Repo = Git.get_repo("LeiLiu1991/test_auto_2")
-        get_pull(Repo)
-        time.sleep(15)
+        for repo in os.environ["repo_list"].split(" "):
+            print repo 
+            Repo = Git.get_repo(repo)
+            get_pull(Repo)
+            time.sleep(15)
 
 if __name__ == '__main__':
     main()
