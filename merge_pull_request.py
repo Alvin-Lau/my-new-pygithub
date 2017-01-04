@@ -36,7 +36,7 @@ def update_database_unmerge_pull_request(epic):
     #PRIMARY KEY(merge_commit_sha) \
     sql_insert_new_record = "INSERT INTO pull_unmerged( \
                                  epic, \
-                             ) VALUES ('"  
+                             ) VALUES ('" \
                                  + str(pull.head.label) + "')"
     try:
         Cursor.execute(sql_insert_new_record)
@@ -154,7 +154,7 @@ def main():
                 for pull in test_auto_pull_list:
                     if pull.head.label == epic and pull.mergeable:
                         mergeable_pull_list.append(pull)
-                    if pull.head.label == epic not pull.mergeable:
+                    if pull.head.label == epic and not pull.mergeable:
                         unmergeable_pull_list.append(pull)
                 if len(mergeable_pull_list) == expected_epic_num:
                     for mergeable_pull in mergeable_pull_list:
