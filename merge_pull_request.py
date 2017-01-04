@@ -1,13 +1,49 @@
 #!/usr/bin/env python
 
 from github import *
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 import MySQLdb
+import smtplib
 import time
+import os
+
 
 github_token = os.environ["GITHUB_API_TOKEN"]
 Git = Github(github_token)
 
 test_auto_pull_list = []
+
+def send_email(html, you):
+    me = "lei.liu@mevoco.com"
+    msg = MIMEMultipart()
+    msg['Subject'] = "One/Several pull request(s) can not be merged"
+    msg['From'] = me
+    msg['To'] = you
+    part2 = MIMEText(html, 'html')
+    msg.attach(part2)
+    s = smtplib.SMTP('localhost')
+    s.sendmail(me, you, msg.as_string())
+    s.quit()
+
+def update_database_unmerge_pull_request(epic):
+
+    Db = MySQLdb.connect("localhost","root","zstack.mysql.password")
+    Cursor = Db.cursor()
+    Cursor.execute("use auto_code_review")
+    #This is a new pull request
+    #PRIMARY KEY(merge_commit_sha) \
+    sql_insert_new_record = "INSERT INTO pull_unmerged( \
+                                 epic, \
+                             ) VALUES ('"  
+                                 + str(pull.head.label) + "')"
+    try:
+        Cursor.execute(sql_insert_new_record)
+        Db.commit()
+    except:
+       Db.rollback()
+    Db.close()
 
 
 def update_datase_pull_merged(pull):
@@ -80,12 +116,21 @@ def main():
                                )'
     Cursor.execute(sql_create_table)
     Db.commit()
+
+    sql_create_table = 'create table if not exists pull_unmerged( \
+                               unmerge_pull_id INT NOT NULL AUTO_INCREMENT, \
+                               epic VARCHAR(100), \
+                               PRIMARY KEY(unmerge_pull_id) \
+                               )'
+    Cursor.execute(sql_create_table)
+    Db.commit()
+
     Db.close()
 
     while True:
         global test_auto_pull_list
 
-        for repo in environ["repo_list"].split(" "):
+        for repo in os.environ["repo_list"].split(" "):
             print repo
             Repo = Git.get_repo(repo)
             get_pull(Repo)
@@ -100,6 +145,7 @@ def main():
 
 
         mergeable_pull_list = []
+        unmergeable_pull_list = []
         for epic in uniqe_pull_epic_list:
             expected_epic_num = int(epic.split("@@")[-1])
 
@@ -108,11 +154,50 @@ def main():
                 for pull in test_auto_pull_list:
                     if pull.head.label == epic and pull.mergeable:
                         mergeable_pull_list.append(pull)
+                    if pull.head.label == epic not pull.mergeable:
+                        unmergeable_pull_list.append(pull)
                 if len(mergeable_pull_list) == expected_epic_num:
-                    for pull in mergeable_pull
-                            update_datase_pull_merged(pull)
-                            pull.merge(pull.title)
+                    for mergeable_pull in mergeable_pull_list:
+                            update_datase_pull_merged(mergeable_pull)
+                            mergeable_pull.merge(str(mergeable_pull.title))
                 else:
+                    epic_unmerged = "SELECT epic from pull_unmerged\
+                                where epic='"  + epic + "'"
+                    epic_query_count = Cursor.execute(sql_query_epic_pull_request)
+                    patches_auther = epic.split(":")[0]
+                    github_user = Git.get_user(patches_auther)
+                    patches_auther_email = github_user.email
+
+                    if int(epic_query_count) ==  0:
+                        html_head = """\
+                          <html>
+                            <head></head>
+                            <body>
+                              <p>Hi! Buddy<br>
+                        """
+                        context = "<h2>Pull requst(s) that can not be merged<\h2>"
+                        for pull in unmergeable_pull_list:
+                            context = context + "<h3>" + pull.title + "</h3>"
+
+                        context =  context + "<h2>Pull requst(s) that can be merged<\h2>"
+                        for pull in mergeable_pull_list:
+                            context = context + "<h3>" + pull.title + "</h3>"
+
+                        html_end = """\
+                              </p>
+                            </body>
+                          </html>
+                        """
+                        html = html_head + context + html_end
+
+                        if patches_auther_email == None:
+                            patches_auther_email = "lei.liu@mevoco.com"
+                            html = "<html><head></head><body><p>Hi!<br><h2>User: " \
+                                   + github_user + " ,don't expose his/her github email" \
+                                   + "</h2></p></body></html>"
+
+                        send_email(html, patches_auther_email)
+                        update_database_unmerge_pull_request(epic)
                     
 
         test_auto_pull_list = []
