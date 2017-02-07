@@ -1,5 +1,6 @@
 #!/usr/bin/bash
 
+set -x
 # chkconfig: - 85 15
 # description: run_code_merge is for code review merge
 
@@ -15,13 +16,14 @@ export GITHUB_API_TOKEN="f4d99a92cf913468bc168173cb6c9ac78c85c2e2"
 export SLACK_USER_TOKEN="xoxp-16588718595-94852999572-120140093584-cd8141b5e434d253204c23f05f240eef"
 
 pip install pygithub 
+pip install slackclient
 
 if [ "$1" == "get_issues" ];then
     python ${JENKINS_HOME}/code_review_script/get_issues.py 
 fi
 
-if [ "$1" == "merge_pull_request" ];then
-    python ${JENKINS_HOME}/code_review_script/get_issues.py 
+if [ "$1" == "add_labels" ];then
+    python ${JENKINS_HOME}/code_review_script/add_labels.py
 fi
 
 #ps -ef | grep python | grep deal_pull_request
