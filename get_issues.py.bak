@@ -1,0 +1,127 @@
+#!/usr/bin/env python
+
+from github import *
+import MySQLdb
+import time
+import os
+
+github_token = os.environ["GITHUB_API_TOKEN"]
+Git = Github(github_token)
+
+def new_pull_request(pull, Cursor):
+    print pull
+    if pull.milestone == None:
+        milestone = "000"
+    else:
+        milestone = pull.milestone.title
+    sql_insert_new_record = "INSERT INTO pull_request( \
+                                 merge_commit_sha, \
+                                 base_commit_sha, \
+                                 url, \
+                                 ref_repo, \
+                                 milestone, \
+                                 epic, \
+                                 test_state, \
+                                 updated_at \
+                             ) VALUES ('"  + merge_commit_sha + "', '" \
+                                 + str(pull.base.sha) + "', '" \
+                                 + str(pull.url) + "', '" \
+                                 + str(pull.head.repo.clone_url) + "', '" \
+                                 + milestone + "', '" \
+                                 + str(pull.head.label) + "', '" \
+                                 + "NEW', '" \
+                                 + str(pull.updated_at.strftime('%Y-%m-%d %H:%M:%S')) + "')"
+    try:
+        print "Insert new record"
+        Cursor.execute(sql_insert_new_record)
+        Db.commit()
+    except Exception as e:
+       Db.rollback()
+       print str(e)
+
+
+
+def get_pull(Repo):
+
+    try:
+        print "Conneting Mysql"
+        Db = MySQLdb.connect(host='172.20.198.222',user='root',passwd='password',port=3306)
+        Cursor = Db.cursor()
+        Cursor.execute("use auto_code_review")
+        Pulls_List = Repo.get_pulls()
+    except Exception as e:
+        print str(e)
+        return
+    
+    for pull in Pulls_List:
+
+        print pull.head.label
+
+        merge_commit_sha = str(pull.merge_commit_sha)
+        sql_query_sha = "SELECT merge_commit_sha from pull_request \
+                         where merge_commit_sha='" + merge_commit_sha +"'"
+        try:
+             num_of_results = Cursor.execute(sql_query_sha)
+
+        except Exception as e:
+             print str(e)
+
+        #This is a new pull request
+                         #                PRIMARY KEY(merge_commit_sha) \
+        if num_of_results == 0:
+            new_pull_request(pull, Cursor)
+    Db.close()
+
+def main():
+    #create database if not exists
+    #Db = MySQLdb.connect("localhost","root","zstack.mysql.password")
+    try:
+        Db = MySQLdb.connect(host='172.20.198.222',user='root',passwd='password',port=3306)
+        Cursor = Db.cursor()
+        Cursor.execute("use auto_code_review")
+        #sql_create_database = 'create database if not exists auto_code_review'
+        #Cursor.execute(sql_create_database)
+        Db.commit()
+    except Exception as e:
+        print str(e)
+
+    #create table  if not exists
+    #code_review_id INT NOT NULL AUTO_INCREMENT,
+    sql_create_table = 'create table if not exists pull_request( \
+                               code_review_id INT NOT NULL AUTO_INCREMENT, \
+                               merge_commit_sha CHAR(64), \
+                               base_commit_sha CHAR(64), \
+                               url VARCHAR(170) NOT NULL, \
+                               label VARCHAR(200), \
+                               ref_repo VARCHAR(300) NOT NULL, \
+                               milestone VARCHAR(20) NOT NULL, \
+                               epic VARCHAR(100), \
+                               test_state CHAR(30) NOT NULL, \
+                               mergeable VARCHAR (20) NOT NULL, \
+                               updated_at datetime, \
+                               PRIMARY KEY(code_review_id) \
+                               )'
+    try:
+        print "Creating table"
+        Cursor.execute(sql_create_table)
+        Db.commit()
+    except Exception as e:
+        Db.rollback()
+        print str(e)
+    Db.close()
+
+    for repo in os.environ["repo_list"].split(" "):
+        print "\n"
+        print repo
+        try:
+            Repo = Git.get_repo(repo)
+
+        except Exception as e:
+            print str(e)
+            continue
+
+        get_pull(Repo)
+        time.sleep(5)
+
+if __name__ == '__main__':
+    main()

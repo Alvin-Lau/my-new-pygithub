@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from github import *
+from slackclient import SlackClient
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -15,17 +16,40 @@ Git = Github(github_token)
 
 test_auto_pull_list = []
 
+def send_slack(context):
+
+    SLACK_TOKEN = os.environ.get('SLACK_USER_TOKEN')
+    slack_client = SlackClient(SLACK_TOKEN)
+    slack_client.api_call(
+        "chat.postMessage",
+        channel="code-review",
+        text=context,
+        username='Robot',
+    )
+
 def send_email(html, you):
-    me = "lei.liu@mevoco.com"
     msg = MIMEMultipart()
+    mail_host = "smtp.163.com"
+    mail_user = "zstack@163.com"
+    mail_password = "zstack2015"
     msg['Subject'] = "One/Several pull request(s) can not be merged"
-    msg['From'] = me
+    msg['From'] = mail_user
     msg['To'] = you
     part2 = MIMEText(html, 'html')
     msg.attach(part2)
-    s = smtplib.SMTP('localhost')
-    s.sendmail(me, you, msg.as_string())
-    s.quit()
+    try:
+        print "try to send"
+        s = smtplib.SMTP(mail_host, 25)
+        s.set_debuglevel(1)
+        s.ehlo()
+        #s.connect(mail_host)
+        #s.connect('localhost')
+        s.login(mail_user, mail_password)
+        s.ehlo()
+        s.sendmail(mail_user, you.split(","), msg.as_string())
+    except Exception as e:
+        print str(e)
+    s.close()
 
 def update_database_unmerge_pull_request(epic):
 
@@ -35,15 +59,17 @@ def update_database_unmerge_pull_request(epic):
     #This is a new pull request
     #PRIMARY KEY(merge_commit_sha) \
     sql_insert_new_record = "INSERT INTO pull_unmerged( \
-                                 epic, \
+                                 epic \
                              ) VALUES ('" \
-                                 + str(pull.head.label) + "')"
+                                 + str(epic) + "')"
     try:
         Cursor.execute(sql_insert_new_record)
         Db.commit()
-    except:
+    except Exception as e:
+       print str(e)
        Db.rollback()
     Db.close()
+    time.sleep(1)
 
 
 def update_datase_pull_merged(pull):
@@ -128,13 +154,15 @@ def main():
     Db.close()
 
     while True:
+        time.sleep(3)
         global test_auto_pull_list
 
         for repo in os.environ["repo_list"].split(" "):
-            print repo
+            time.sleep(3)
+          #  print repo
             Repo = Git.get_repo(repo)
             get_pull(Repo)
-        print test_auto_pull_list
+       # print test_auto_pull_list
 
         pull_epic_list = []
 
@@ -147,6 +175,7 @@ def main():
         mergeable_pull_list = []
         unmergeable_pull_list = []
         for epic in uniqe_pull_epic_list:
+            time.sleep(5)
             expected_epic_num = int(epic.split("@@")[-1])
 
             if pull_epic_list.count(epic) == expected_epic_num:
@@ -160,40 +189,43 @@ def main():
                     for mergeable_pull in mergeable_pull_list:
                             update_datase_pull_merged(mergeable_pull)
                             mergeable_pull.merge(str(mergeable_pull.title))
+                            time.sleep(2)
                 else:
-                    epic_unmerged = "SELECT epic from pull_unmerged\
-                                where epic='"  + epic + "'"
-                    epic_query_count = Cursor.execute(sql_query_epic_pull_request)
+                    #print epic
+                    Db = MySQLdb.connect("localhost","root","zstack.mysql.password")
+                    Cursor = Db.cursor()
+                    Cursor.execute("use auto_code_review")
+                    epic_unmerged = 'SELECT epic from pull_unmerged \
+                                where epic="'  + epic + '"'
+                    epic_query_count = 0
+                    try:
+                        epic_query_count = Cursor.execute(epic_unmerged)
+                        Db.commit()
+                    except:
+                       Db.rollback()
+                    Db.close()
+
                     patches_auther = epic.split(":")[0]
                     github_user = Git.get_user(patches_auther)
                     patches_auther_email = github_user.email
 
                     if int(epic_query_count) ==  0:
-                        html_head = """\
-                          <html>
-                            <head></head>
-                            <body>
-                              <p>Hi! Buddy<br>
-                        """
-                        context = "<h2>Pull requst(s) that can not be merged<\h2>"
+                        html_head = """<html><head></head><body><p>Hi! Buddy<br></p>"""
+                        context = "<h2>Pull requst(s) that can not be merged</h2>"
                         for pull in unmergeable_pull_list:
-                            context = context + "<h3>" + pull.title + "</h3>"
+                            context = context + "<p>" + pull.title + "<br></p>"
 
-                        context =  context + "<h2>Pull requst(s) that can be merged<\h2>"
+                        context =  context + "<h2>Pull requst(s) that can be merged</h2>"
                         for pull in mergeable_pull_list:
-                            context = context + "<h3>" + pull.title + "</h3>"
+                            context = context + "<p>" + pull.title + "<br></p>"
 
-                        html_end = """\
-                              </p>
-                            </body>
-                          </html>
-                        """
+                        html_end = """</body></html>"""
                         html = html_head + context + html_end
 
                         if patches_auther_email == None:
                             patches_auther_email = "lei.liu@mevoco.com"
                             html = "<html><head></head><body><p>Hi!<br><h2>User: " \
-                                   + github_user + " ,don't expose his/her github email" \
+                                   + patches_auther + " ,do not expose his/her github email" \
                                    + "</h2></p></body></html>"
 
                         send_email(html, patches_auther_email)
