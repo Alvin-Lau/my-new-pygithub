@@ -2,6 +2,7 @@ Dependency
 install Mysql
 pip install pygithub
 pip install slackclient
+pip install gitpython
 
 #Ubuntu
 apt-get install libmysqlclient-dev
